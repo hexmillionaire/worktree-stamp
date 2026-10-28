@@ -39,8 +39,13 @@ async function git(root, args, signal) {
   const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^GIT_/i.test(key)));
   Object.assign(env, { GIT_OPTIONAL_LOCKS: '0', GIT_TERMINAL_PROMPT: '0', GIT_NO_LAZY_FETCH: '1' });
   try {
-    return (await execute('git', ['--no-lazy-fetch', '--no-optional-locks', '-c', 'core.fsmonitor=false', '-c', 'core.untrackedCache=false', '-C', root, ...args], { env, signal, timeout: 15000, maxBuffer: LIMITS.gitBytes, encoding: 'buffer', windowsHide: true })).stdout;
+    const result = await execute('git', ['--no-lazy-fetch', '--no-optional-locks', '-c', 'core.fsmonitor=false', '-c', 'core.untrackedCache=false', '-C', root, ...args], { env, signal, timeout: 15000, maxBuffer: LIMITS.gitBytes, encoding: 'buffer', windowsHide: true });
+    // Git can omit unreadable untracked directories while returning exit 0.
+    // Any warning makes completeness indeterminate; never echo its private text.
+    if (result.stderr.length) fail('GIT_WARNING', 'Git reported a metadata warning; completeness is indeterminate.');
+    return result.stdout;
   } catch (error) {
+    if (error instanceof StampError) throw error;
     signal.throwIfAborted();
     fail(error.code === 'ENOENT' ? 'GIT_MISSING' : 'GIT_UNAVAILABLE', error.code === 'ENOENT' ? 'Git 2.45+ is required on PATH.' : 'Git metadata could not be read within supported bounds; Git 2.45+ and local committed objects are required.');
   }

@@ -223,6 +223,29 @@ test('CLI uses explicit status codes and strips hostile Git redirection', async 
   await assert.rejects(access(path.join(parent, 'must-not-create-index')), { code: 'ENOENT' });
 });
 
+test('a real Git warning with exit zero cannot be reported fresh', async t => {
+  const { root } = await fixture(t);
+  const head = git(root, ['rev-parse', 'HEAD']).trim();
+  git(root, ['update-ref', 'refs/tags/HEAD', head]);
+  git(root, ['config', 'core.warnAmbiguousRefs', 'true']);
+  const probe = spawnSync('git', ['--no-lazy-fetch', '-C', root, 'rev-parse', '--verify', 'HEAD'], { encoding: 'utf8', windowsHide: true, timeout: 15000 });
+  assert.equal(probe.status, 0); assert.match(probe.stderr, /ambiguous/i);
+  await assert.rejects(captureStamp(root), error => error.code === 'GIT_WARNING' && !error.message.includes(probe.stderr.trim()) && !error.message.includes(root));
+});
+
+test('unreadable untracked directories fail indeterminate instead of omitting regular files', { skip: process.platform === 'win32' || process.getuid?.() === 0 }, async t => {
+  const { root } = await fixture(t);
+  const directory = path.join(root, 'unreadable');
+  await mkdir(directory); await writeFile(path.join(directory, 'fictional.txt'), 'must not disappear from coverage');
+  assert.ok((await captureStamp(root)).state.files.some(entry => entry.path === 'unreadable/fictional.txt'));
+  await chmod(directory, 0);
+  try {
+    const probe = spawnSync('git', ['--no-lazy-fetch', '-C', root, 'ls-files', '--others', '--exclude-standard', '-z'], { encoding: 'utf8', timeout: 15000 });
+    assert.equal(probe.status, 0); assert.ok(probe.stderr.length > 0, 'Git must expose the incomplete scan through a warning');
+    await assert.rejects(captureStamp(root), { code: 'GIT_WARNING' });
+  } finally { await chmod(directory, 0o700); }
+});
+
 test('POSIX owner-to-group execute-bit changes invalidate unchanged bytes', { skip: process.platform === 'win32' }, async t => {
   const { root } = await fixture(t);
   const filename = path.join(root, 'src/app.txt');
@@ -244,12 +267,12 @@ for (const fault of ['during-read', 'between-passes']) test(`observed ${fault} m
     import path from 'node:path';
     import { syncBuiltinESMExports } from 'node:module';
     const [source, root, fault] = process.argv.slice(1);
-    const target = path.join(root, 'src/app.txt');
+    const target = await fs.promises.realpath(path.join(root, 'src/app.txt'));
     const original = fs.promises.open;
     let changed = false;
     fs.promises.open = async (filename, ...args) => {
       const handle = await original(filename, ...args);
-      if (path.resolve(filename).toLowerCase() === target.toLowerCase() && !changed) {
+      if (await fs.promises.realpath(filename) === target && !changed) {
         const method = fault === 'during-read' ? 'read' : 'close';
         const operation = handle[method].bind(handle);
         handle[method] = async (...parameters) => {
@@ -262,18 +285,22 @@ for (const fault of ['during-read', 'between-passes']) test(`observed ${fault} m
     };
     syncBuiltinESMExports();
     const { captureStamp } = await import(source);
-    await assert.rejects(captureStamp(root), {code:'OBSERVED_RACE'});
-    assert.equal(changed, true);
+    let failure;
+    try { await captureStamp(root); } catch (error) { failure = error; }
+    assert.equal(changed, true, 'The actual mutation arm must execute before assessing the race result');
+    assert.equal(failure?.code, 'OBSERVED_RACE');
   `, source, root, fault], { encoding: 'utf8', windowsHide: true, timeout: 30000 });
   assert.equal(child.status, 0, child.stderr || child.error?.message);
 });
 
-test('POSIX control characters in paths stay JSON data and special files are unsupported', { skip: process.platform === 'win32' }, async t => {
+test('POSIX control characters stay JSON data and an indexed FIFO is unsupported', { skip: process.platform === 'win32' }, async t => {
   const { root } = await fixture(t);
   await writeFile(path.join(root, 'line\nbreak\tfile.txt'), 'fictional');
   const stamp = await captureStamp(root);
   assert.ok(stamp.state.files.some(entry => entry.path === 'line\nbreak\tfile.txt'));
-  const fifo = spawnSync('mkfifo', [path.join(root, 'named-pipe')], { encoding: 'utf8' });
+  const indexed = path.join(root, 'src/app.txt');
+  await unlink(indexed);
+  const fifo = spawnSync('mkfifo', [indexed], { encoding: 'utf8' });
   assert.equal(fifo.status, 0, fifo.stderr);
   await assert.rejects(captureStamp(root), { code: 'SPECIAL_UNSUPPORTED' });
 });

@@ -12,12 +12,15 @@ worktree-stamp check ../project-stamp.json --repo /path/to/project --json
 
 Save the JSON **outside the observed repository**, or in an intentionally ignored location. Creating a new included output file changes the state being observed. Shell redirection creates the destination before starting the program, so an output inside the repository can even be included while empty.
 
-You can place a checkpoint around a command you run yourself:
+You can place a checkpoint around a command you run yourself. This POSIX shell example preserves a failed test result instead of replacing it with the stamp check's exit status:
 
 ```sh
-worktree-stamp capture > ../before-check.json
-npm test
-worktree-stamp check ../before-check.json --json
+worktree-stamp capture > ../before-check.json || exit 2
+if npm test; then
+  worktree-stamp check ../before-check.json --json
+else
+  exit 1
+fi
 ```
 
 The last command compares included state. Read the test command's own result separately. A fresh stamp says nothing about whether that command ran, passed, selected the right tests or verified the requested behavior.
@@ -35,9 +38,11 @@ Capture performs two complete observations and requires them to match. It checks
 
 ## Exclusions and limits
 
-Ignored files, external state, environment variables, toolchain versions, running services and test results are uncovered. Ignored dependency trees can change without invalidating a stamp. Ordinary Git exclusion rules determine which untracked paths are included; tracked files remain included even if a matching ignore pattern exists.
+Ignored files, external state, environment variables, toolchain versions, running services and test results are uncovered. Ignored dependency trees can change without invalidating a stamp. Ordinary Git exclusion rules determine which untracked paths are included; tracked files remain included even if a matching ignore pattern exists. Untracked special files that Git does not enumerate, such as FIFOs, are outside coverage. Special files replacing indexed paths are detected and refused.
 
 Included symlinks, directory junctions, special files, submodules/gitlinks, unresolved conflicts and intent-to-add index entries are unsupported. Capture returns indeterminate instead of silently omitting them. Stage or remove intent-to-add entries before capture; their mode/object IDs alone can be identical to a genuinely staged empty file. Git's own administrative references for linked worktrees remain supported. A committed HEAD is required; unborn/bare repositories and unsupported index formats fail indeterminate. Sparse/partially checked out paths may appear missing; this is a disk observation, not materialization or checkout validation.
+
+Any Git stderr output makes the observation indeterminate, even when Git exits zero. This prevents an unreadable untracked directory warning from silently turning an incomplete path list into a fresh result. Diagnostics use fixed messages rather than echoing Git's potentially private text.
 
 Fixed initial limits: 10,000 included paths, 16 MiB per file, 128 MiB read per observation, 4 KiB per relative path, 4 MiB per Git response and 8 MiB per JSON artifact. Files stream through one reused 1 MiB buffer. Git subprocesses have 15-second timeouts; capture checks a 60-second deadline and optional cancellation between I/O operations. A kernel/filesystem operation already blocked cannot be synchronously cancelled by JavaScript.
 

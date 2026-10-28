@@ -6,6 +6,8 @@ Included source links and special files are refused. Git metadata itself is read
 
 Ignored inputs, external configuration/environment/services and test results are outside coverage. Restoring previously observed bytes can restore a fingerprint; changes that occurred and were undone between observations are not detectable history. Unreadable, excessive or unsupported state fails indeterminate instead of fresh.
 
+Untracked special files omitted by Git's enumeration are uncovered; indexed paths replaced by special files are refused. Nonempty Git stderr fails indeterminate even with exit zero, because a warning can describe an incomplete untracked-directory scan. Raw warning text is not echoed.
+
 Artifacts contain relative paths, sizes, modes and hashes. These can disclose private information even though raw source bytes and absolute roots are omitted. Review reports before sharing them. Git errors are deliberately summarized without echoing local paths or configured command text.
 
 For a suspected vulnerability, use GitHub's private vulnerability reporting if available. Share a fictional reproducer and expected/actual boundary; do not post credentials, private repository content or personal paths in a public issue. No response time or security certification is promised.
