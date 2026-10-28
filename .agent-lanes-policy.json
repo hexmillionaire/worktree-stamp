@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "lanes": {
+    "development": {
+      "allow": ["src/**", "bin/**", "test/**", "scripts/**", "docs/**", "*.md", "package.json", "package-lock.json", ".github/**", ".gitignore"],
+      "deny": ["LICENSE", ".agent-lanes-policy.json", ".github/workflows/**"]
+    }
+  }
+}

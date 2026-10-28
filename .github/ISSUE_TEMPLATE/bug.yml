@@ -1,0 +1,24 @@
+name: Freshness or portability bug
+description: Report a fictional reproduction with expected and observed state.
+body:
+  - type: textarea
+    id: versions
+    attributes:
+      label: Versions and platform
+      description: Worktree Stamp, Node, Git and operating system versions.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Fictional reproduction
+      description: Include exact commands in a disposable repository. Exclude private contents, paths, transcripts and credentials.
+    validations:
+      required: true
+  - type: textarea
+    id: results
+    attributes:
+      label: Expected and observed result
+      description: Include exit codes and sanitized JSON. A matching stamp does not establish that tests passed.
+    validations:
+      required: true

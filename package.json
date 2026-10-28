@@ -1,0 +1,15 @@
+{
+  "name": "@hexmillionaire/worktree-stamp",
+  "version": "0.1.0",
+  "description": "Read-only Git content freshness stamps, including dirty worktree, index and nonignored untracked bytes.",
+  "type": "module",
+  "bin": { "worktree-stamp": "bin/worktree-stamp.mjs" },
+  "exports": "./src/index.mjs",
+  "files": ["bin", "src", "docs", "README.md", "LICENSE", "SECURITY.md", "CHANGELOG.md"],
+  "scripts": { "test": "node --test", "test:package": "node scripts/package-smoke.mjs" },
+  "engines": { "node": ">=24.8.0" },
+  "repository": { "type": "git", "url": "https://github.com/hexmillionaire/worktree-stamp.git" },
+  "license": "MIT",
+  "keywords": ["git", "worktree", "fingerprint", "freshness", "coding-agents", "offline"],
+  "publishConfig": { "access": "public" }
+}
